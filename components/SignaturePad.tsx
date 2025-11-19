@@ -78,6 +78,8 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
       // This clears the canvas content
       canvas.width = width * ratio;
       canvas.height = height * ratio;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
       
       const ctx = canvas.getContext("2d");
       if (ctx) {
@@ -120,11 +122,11 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
         const canvas = canvasRef.current;
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         return {
-            width: canvas?.width || 0,
-            height: canvas?.height || 0,
-            ratio: ratio,
+            width: canvas?.clientWidth || canvas?.width || 0,
+            height: canvas?.clientHeight || canvas?.height || 0,
+            ratio,
             pen_width: pad ? ((pad.minWidth + pad.maxWidth) / 2) * ratio : 2,
-        }
+        };
     }
   }));
 
