@@ -28,6 +28,35 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
   onBeginRef.current = onBegin;
   onEndRef.current = onEnd;
 
+  const resizeCanvas = React.useCallback(() => {
+    const canvas = canvasRef.current;
+    const pad = signaturePadRef.current;
+    if (!canvas || !pad) return;
+
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const width = canvas.offsetWidth || canvas.parentElement?.clientWidth || 0;
+    const height = canvas.offsetHeight || canvas.parentElement?.clientHeight || 0;
+    if (!width || !height) return;
+
+    if (canvas.width === width * ratio && canvas.height === height * ratio) return;
+
+    const data = pad.toData();
+
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(ratio, ratio);
+    }
+
+    pad.clear();
+    pad.fromData(data);
+  }, []);
+
   // Initialize SignaturePad
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -48,48 +77,20 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
     pad.addEventListener("endStroke", () => onEndRef.current?.());
 
     signaturePadRef.current = pad;
+    resizeCanvas();
 
     return () => {
       pad.off();
       // Note: We don't destroy the instance explicitly as SignaturePad doesn't have a destroy method that cleans up DOM,
       // but off() removes listeners.
     };
-  }, [penColor]); // Removed onBegin/onEnd from dependencies to prevent canvas wipe on parent re-render
+  }, [penColor, resizeCanvas]); // Removed onBegin/onEnd from dependencies to prevent canvas wipe on parent re-render
 
   // Handle Resizing (CRITICAL for mobile/retina displays)
   useLayoutEffect(() => {
     const handleResize = () => {
-      if (!canvasRef.current || !signaturePadRef.current || !containerRef.current) return;
-
-      const canvas = canvasRef.current;
-      const container = containerRef.current;
-      
-      // Get the computed style width/height of the container
-      const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-
-      // If dimensions haven't changed, don't do anything
-      if (canvas.width === width * ratio && canvas.height === height * ratio) return;
-
-      // Store current data to restore after resize
-      const data = signaturePadRef.current.toData();
-
-      // This clears the canvas content
-      canvas.width = width * ratio;
-      canvas.height = height * ratio;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-        ctx.scale(ratio, ratio);
-      }
-      
-      // CRITICAL FIX: Restore the data immediately so the signature doesn't disappear
-      signaturePadRef.current.clear(); // Reset internal state
-      signaturePadRef.current.fromData(data); // Redraw lines
+      if (!containerRef.current) return;
+      resizeCanvas();
     };
 
     // Use ResizeObserver for robust size detection
@@ -107,7 +108,7 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [resizeCanvas]);
 
   // Expose methods to parent
   React.useImperativeHandle(ref, () => ({
@@ -122,8 +123,8 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
         const canvas = canvasRef.current;
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         return {
-            width: canvas?.clientWidth || canvas?.width || 0,
-            height: canvas?.clientHeight || canvas?.height || 0,
+            width: canvas?.offsetWidth || canvas?.clientWidth || 0,
+            height: canvas?.offsetHeight || canvas?.clientHeight || 0,
             ratio,
             pen_width: pad ? ((pad.minWidth + pad.maxWidth) / 2) * ratio : 2,
         };
