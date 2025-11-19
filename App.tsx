@@ -2,6 +2,33 @@ import React, { useEffect, useRef, useState } from 'react';
 import SignatureCanvas, { SignaturePadRef } from './components/SignaturePad';
 import { prepareSignaturePayload } from './services/compressionService';
 
+interface StartPayload {
+  token?: string;
+  session_id?: string;
+  name?: string;
+  project?: string;
+  amount?: string;
+  rules?: string;
+  consent?: string;
+}
+
+const decodeStartPayload = (raw?: string | null): StartPayload | null => {
+  if (!raw) return null;
+  try {
+    let normalized = raw.replace(/-/g, '+').replace(/_/g, '/');
+    while (normalized.length % 4 !== 0) {
+      normalized += '=';
+    }
+    const binary = window.atob(normalized);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const decoded = new TextDecoder().decode(bytes);
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.warn('Failed to decode start_param payload', error);
+    return null;
+  }
+};
+
 // Initial State Interface
 interface AppState {
   token: string;
@@ -40,20 +67,27 @@ const App: React.FC = () => {
     if (tg) {
       tg.ready();
       tg.expand();
-      // Set header color to match bg
-      if(tg.setHeaderColor) tg.setHeaderColor(tg.themeParams.secondary_bg_color || '#f5f7fb');
+      if (tg.setHeaderColor) {
+        tg.setHeaderColor(tg.themeParams.secondary_bg_color || '#f5f7fb');
+      }
+      if (tg.setBackgroundColor) {
+        tg.setBackgroundColor(tg.themeParams.bg_color || '#f5f7fb');
+      }
     }
 
     const params = new URLSearchParams(window.location.search);
+    const startParam = tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam');
+    const startPayload = decodeStartPayload(startParam);
+
     setState(prev => ({
       ...prev,
-      token: params.get("token") || "",
-      sessionId: params.get("session_id") || "",
-      displayName: params.get("name") || prev.displayName,
-      projectName: params.get("project") || prev.projectName,
-      amount: params.get("amount") || "",
-      rulesUrl: params.get("rules") || prev.rulesUrl,
-      consentText: params.get("consent") || prev.consentText,
+      token: startPayload?.token || params.get('token') || '',
+      sessionId: startPayload?.session_id || params.get('session_id') || '',
+      displayName: startPayload?.name || params.get('name') || prev.displayName,
+      projectName: startPayload?.project || params.get('project') || prev.projectName,
+      amount: startPayload?.amount || params.get('amount') || '',
+      rulesUrl: startPayload?.rules || params.get('rules') || prev.rulesUrl,
+      consentText: startPayload?.consent || params.get('consent') || prev.consentText,
     }));
   }, [tg]);
 
