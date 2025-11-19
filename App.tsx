@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SignatureCanvas, { SignaturePadRef } from './components/SignaturePad';
-import { prepareSignaturePayload } from './services/compressionService';
 
 interface StartPayload {
   token?: string;
@@ -131,25 +130,13 @@ const App: React.FC = () => {
     
     setState(prev => ({ ...prev, isSubmitting: true }));
 
-    // Process data
     const rawData = padRef.current?.toData();
     const canvasMeta = padRef.current?.getCanvasMeta();
+    const imageData = padRef.current?.toImageURL();
 
-    if (!rawData || !canvasMeta) {
+    if (!rawData || !canvasMeta || !imageData) {
       setState(prev => ({ ...prev, isSubmitting: false }));
       return;
-    }
-
-    // Compression
-    const signaturePayload = prepareSignaturePayload(rawData, canvasMeta.width, canvasMeta.height);
-
-    if (!signaturePayload) {
-        safeShowPopup(
-            "Слишком сложная подпись",
-            "Подпись содержит слишком много деталей. Пожалуйста, попробуйте расписаться проще."
-        );
-        setState(prev => ({ ...prev, isSubmitting: false }));
-        return;
     }
 
     const payload = {
@@ -160,12 +147,7 @@ const App: React.FC = () => {
         display_name: state.displayName,
         project: state.projectName,
       },
-      ...(signaturePayload.type === 'compressed' ? {
-          signature_compressed: signaturePayload.base64,
-          compression: signaturePayload.compression
-      } : {
-          signature_binary: signaturePayload.base64
-      })
+      signature: imageData,
     };
 
     try {

@@ -13,6 +13,7 @@ export interface SignaturePadRef {
   isEmpty: () => boolean;
   toData: () => any;
   getCanvasMeta: () => { width: number; height: number; ratio: number; pen_width: number };
+  toImageURL: () => string | null;
 }
 
 const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ onBegin, onEnd, penColor = "#1F5AA6" }, ref) => {
@@ -128,7 +129,8 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
             ratio,
             pen_width: pad ? ((pad.minWidth + pad.maxWidth) / 2) * ratio : 2,
         };
-    }
+    },
+    toImageURL: () => signaturePadRef.current?.toDataURL('image/png') || null,
   }));
 
   return (
