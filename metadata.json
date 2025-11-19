@@ -1,0 +1,5 @@
+{
+  "name": "Telegram Signature App",
+  "description": "React-приложение для подписания договоров в Telegram с поддержкой сжатия данных.",
+  "requestFramePermissions": []
+}
