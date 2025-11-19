@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SignatureCanvas, { SignaturePadRef } from './components/SignaturePad';
+import { prepareSignaturePayload } from './services/compressionService';
 
 interface StartPayload {
   token?: string;
@@ -42,6 +43,8 @@ interface AppState {
   isSubmitting: boolean;
   showRules: boolean;
 }
+
+const MAX_REQUEST_BYTES = 4096;
 
 const App: React.FC = () => {
   const padRef = useRef<SignaturePadRef>(null);
@@ -132,23 +135,84 @@ const App: React.FC = () => {
 
     const rawData = padRef.current?.toData();
     const canvasMeta = padRef.current?.getCanvasMeta();
-    const imageData = padRef.current?.toImageURL();
 
-    if (!rawData || !canvasMeta || !imageData) {
+    if (!rawData || !canvasMeta) {
       setState(prev => ({ ...prev, isSubmitting: false }));
       return;
     }
 
-    const payload = {
+    const encoder = new TextEncoder();
+    const basePayload = {
       token: state.token,
       session_id: state.sessionId,
-      canvas: canvasMeta,
       client_info: {
         display_name: state.displayName,
         project: state.projectName,
       },
-      signature: imageData,
     };
+
+    const baseBytes = encoder.encode(JSON.stringify(basePayload)).length;
+    let availableSignatureChars = Math.max(256, MAX_REQUEST_BYTES - baseBytes);
+
+    let signaturePayload = prepareSignaturePayload(
+      rawData,
+      canvasMeta.width,
+      canvasMeta.height,
+      availableSignatureChars
+    );
+    if (!signaturePayload) {
+      safeShowPopup(
+        'Подпись слишком сложная',
+        'Не удалось упаковать подпись в лимит 4 КБ. Попробуйте расписаться чуть проще.'
+      );
+      setState(prev => ({ ...prev, isSubmitting: false }));
+      return;
+    }
+
+    const assemblePayload = () => ({
+      ...basePayload,
+      ...(signaturePayload!.type === 'compressed'
+        ? {
+            signature_compressed: signaturePayload!.base64,
+            compression: signaturePayload!.compression,
+          }
+        : { signature_binary: signaturePayload!.base64 }),
+    });
+
+    let payload = assemblePayload();
+    let payloadBytes = encoder.encode(JSON.stringify(payload)).length;
+
+    if (payloadBytes > MAX_REQUEST_BYTES) {
+      const ratio = payloadBytes / MAX_REQUEST_BYTES;
+      const adjustedLimit = Math.max(
+        200,
+        Math.floor(availableSignatureChars / ratio)
+      );
+      signaturePayload = prepareSignaturePayload(
+        rawData,
+        canvasMeta.width,
+        canvasMeta.height,
+        adjustedLimit
+      );
+      if (!signaturePayload) {
+        safeShowPopup(
+          'Подпись слишком сложная',
+          'Не удалось упаковать подпись в лимит 4 КБ. Попробуйте расписаться чуть проще.'
+        );
+        setState(prev => ({ ...prev, isSubmitting: false }));
+        return;
+      }
+      payload = assemblePayload();
+      payloadBytes = encoder.encode(JSON.stringify(payload)).length;
+      if (payloadBytes > MAX_REQUEST_BYTES) {
+        safeShowPopup(
+          'Подпись слишком сложная',
+          'Не удалось отправить подпись: даже после сжатия размер превышает лимит Telegram.'
+        );
+        setState(prev => ({ ...prev, isSubmitting: false }));
+        return;
+      }
+    }
 
     try {
         if (tg) {
