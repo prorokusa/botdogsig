@@ -75,6 +75,9 @@ const App: React.FC = () => {
       if (tg.setBackgroundColor) {
         tg.setBackgroundColor(tg.themeParams.bg_color || '#f5f7fb');
       }
+      if (tg.disableVerticalSwipes) {
+        tg.disableVerticalSwipes();
+      }
     }
 
     const params = new URLSearchParams(window.location.search);

@@ -76,11 +76,23 @@ const SignatureCanvas = React.forwardRef<SignaturePadRef, SignaturePadProps>(({ 
     pad.addEventListener("beginStroke", () => onBeginRef.current?.());
     pad.addEventListener("endStroke", () => onEndRef.current?.());
 
+    const preventDefault = (event: TouchEvent) => {
+      event.preventDefault();
+    };
+    canvasRef.current.addEventListener('touchstart', preventDefault, { passive: false });
+    canvasRef.current.addEventListener('touchmove', preventDefault, { passive: false });
+    canvasRef.current.addEventListener('touchend', preventDefault, { passive: false });
+
     signaturePadRef.current = pad;
     resizeCanvas();
 
     return () => {
       pad.off();
+      if (canvasRef.current) {
+        canvasRef.current.removeEventListener('touchstart', preventDefault);
+        canvasRef.current.removeEventListener('touchmove', preventDefault);
+        canvasRef.current.removeEventListener('touchend', preventDefault);
+      }
       // Note: We don't destroy the instance explicitly as SignaturePad doesn't have a destroy method that cleans up DOM,
       // but off() removes listeners.
     };

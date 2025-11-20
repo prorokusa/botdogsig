@@ -26,6 +26,7 @@ export interface TelegramWebApp {
   viewportStableHeight: number;
   setHeaderColor?: (color: string) => void;
   setBackgroundColor?: (color: string) => void;
+  disableVerticalSwipes?: () => void;
   ready: () => void;
   expand: () => void;
   close: () => void;
